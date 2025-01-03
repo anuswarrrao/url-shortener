@@ -1,148 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>URL Shortener</title>
+
     <link rel="icon" href="{{ url_for('static', filename='images/favicon.svg') }}" type="image/x-icon" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="text-center mb-4">
+        <i class="fas fa-link"></i> URL Shortener
+      </h1>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
-
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-<div class="container">
-    <h1 class="text-center mb-4"><i class="fas fa-link"></i> URL Shortener</h1>
-
-    <!-- Responsive Form -->
-    <form id="shorten_form" class="mb-4" data-parsley-validate>
+      <form id="shorten_form" class="mb-4" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        
         <div class="mb-3">
-            <label for="original_url" class="form-label">Original URL</label>
-            <div class="input-group">
-                <span class="input-group-text"><i class="fas fa-link"></i></span>
-                <input type="url" class="form-control" id="original_url" name="original_url" placeholder="Enter URL (https://example.com)" required data-parsley-trigger="change">
+          <label for="original_url" class="form-label">Original URL</label>
+          <input type="url" class="form-control" id="original_url" name="original_url" placeholder="Enter a valid URL (e.g., https://example.com)" required />
+        </div>
+
+        <div class="mb-3">
+          <label for="custom_slug" class="form-label">Custom Slug (Optional)</label>
+          <input type="text" class="form-control" id="custom_slug" name="custom_slug" placeholder="Enter a custom slug (e.g., my-custom-slug)" />
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Expiration Date</label>
+          <div class="d-flex">
+            <div class="me-2">
+              <select class="form-select" id="duration_value" name="duration_value" required>
+                <option value="1" selected>1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
             </div>
+
+            <div>
+              <select class="form-select" id="duration_type" name="duration_type" required>
+                <option value="days" selected>Days</option>
+                <option value="weeks">Weeks</option>
+                <option value="months">Months</option>
+                <option value="years">Years</option>
+              </select>
+            </div>
+          </div>
         </div>
         
+        <button type="submit" class="btn btn-primary w-100">Shorten URL</button>
+      </form>
 
-        <div class="mb-3">
-            <label for="custom_slug" class="form-label">Custom Slug (Optional)</label>
-            <div class="input-group">
-                <span class="input-group-text"><i class="fas fa-tag"></i></span>
-                <input type="text" class="form-control" id="custom_slug" name="custom_slug" placeholder="Custom slug" data-parsley-pattern="^[a-zA-Z0-9-_]+$" data-parsley-pattern-message="Only alphanumeric characters, dashes, and underscores are allowed.">
-            </div>
+      <div id="shortened_section" class="d-none">
+        <label for="shortened_url" class="form-label">Shortened URL</label>
+        <div class="input-group">
+          <input type="text" class="form-control" id="shortened_url" readonly />
+          <button class="btn btn-outline-secondary btn-copy" id="copy_button">
+            Copy
+          </button>
         </div>
-
-        <div class="text-center">
-            <button type="submit" class="btn btn-primary w-100">
-                <i class="fas fa-paper-plane"></i> Shorten URL
-            </button>
-        </div>
-    </form>
-
-    <br>
-
-    <!-- Shortened URL Section -->
-    <h5 class="mb-3"><i class="fas fa-compress-alt"></i> Shortened URL</h5>
-    <div class="input-group mb-4 Shortened">
-        <input type="text" class="form-control" id="shortened_url" readonly>
-        <button class="btn btn-outline-secondary" id="copy_button" data-clipboard-target="#shortened_url">
-            <i class="fas fa-copy"></i> Copy
-        </button>
-        <button class="btn btn-outline-success" id="redirect_button">
-            <i class="fa-solid fa-arrow-up-right-from-square"></i> Redirect
-        </button>
+      </div>
     </div>
-</div>
 
-    <!-- Scripts -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.10/clipboard.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/parsleyjs@2.9.2/dist/parsley.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+
     <script>
-        $("#shorten_form").on("submit", async function (event) {
-            event.preventDefault();
-    
-            if ($("#shorten_form").parsley().isValid()) {
-                const originalUrl = $("#original_url").val();
-                const customSlug = $("#custom_slug").val();
-    
-                const response = await fetch("/shorten", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        original_url: originalUrl,
-                        custom_slug: customSlug,
-                    }),
-                });
-    
-                const data = await response.json();
-                if (response.ok) {
-                    // If the response is OK, show the shortened URL
-                    $("#shortened_url").val(data.shortened_url);
-                } else {
-                    // If there is an error (e.g., custom slug already taken), show SweetAlert2 error
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Custom Slug Taken',
-                        text: data.error || 'An error occurred. Please try again.',
-                    });
-                }
-            } else {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Invalid Input',
-                    text: 'Please enter a valid URL',
-                });
-            }
+      const form = document.getElementById("shorten_form");
+      const shortenedSection = document.getElementById("shortened_section");
+      const shortenedUrlInput = document.getElementById("shortened_url");
+      const copyButton = document.getElementById("copy_button");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const originalUrl = document.getElementById("original_url").value;
+        const customSlug = document.getElementById("custom_slug").value;
+        const durationValue = document.getElementById("duration_value").value;
+        const durationType = document.getElementById("duration_type").value;
+
+        const csrfToken = document.querySelector(
+          'input[name="csrf_token"]'
+        ).value;
+
+        const response = await fetch("/shorten", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken,
+          },
+          body: JSON.stringify({
+            original_url: originalUrl,
+            custom_slug: customSlug,
+            duration_value: durationValue,
+            duration_type: durationType,
+          }),
         });
-    
-        // Initialize Clipboard.js
-        const clipboard = new ClipboardJS("#copy_button");
-        clipboard.on("success", function (e) {
-            Swal.fire({
-                icon: "success",
-                title: "Copied!",
-                text: "The shortened URL has been copied to your clipboard.",
-                timer: 1500,
-                showConfirmButton: false,
-            });
-            e.clearSelection();
-        });
-    
-        clipboard.on("error", function (e) {
-            Swal.fire({
-                icon: "error",
-                title: "Oops!",
-                text: "Failed to copy. Please try again.",
-            });
-        });
-    
-        $("#redirect_button").on("click", function () {
-            const shortenedUrl = $("#shortened_url").val();
-            if (shortenedUrl) {
-                Swal.fire({
-                    title: "Redirect to URL?",
-                    text: "You will be redirected to the shortened URL.",
-                    icon: "warning",
-                    showCancelButton: true,
-                    confirmButtonText: "Yes, Redirect",
-                    cancelButtonText: "Cancel",
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        window.open(shortenedUrl, "_blank");
-                    }
-                });
-            } else {
-                Swal.fire("No URL", "Please shorten a URL first.", "info");
-            }
-        });
-    </script>          
+
+        const data = await response.json();
+        if (response.ok) {
+          shortenedUrlInput.value = data.shortened_url;
+          shortenedSection.classList.remove("d-none");
+          Swal.fire("Success", "URL shortened successfully!", "success");
+        } else {
+          Swal.fire(
+            "Error",
+            data.error || "An error occurred. Please try again.",
+            "error"
+          );
+        }
+      });
+
+      copyButton.addEventListener("click", () => {
+        shortenedUrlInput.select();
+        document.execCommand("copy");
+        Swal.fire(
+          "Copied!",
+          "The shortened URL has been copied to your clipboard.",
+          "success"
+        );
+      });
+    </script>
   </body>
 </html>
